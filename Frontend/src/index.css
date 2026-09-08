@@ -1,0 +1,256 @@
+@import "tailwindcss";
+
+/* ============================================================
+   ASARI SAMPLE TRACKING
+   GLOBAL APPLICATION BACKGROUND
+   ============================================================ */
+
+/*
+ * Background global unique pour toute l'application.
+ *
+ * L'image bg_1.png est placée à la racine du projet Frontend,
+ * au même niveau que src/.
+ *
+ * Exemple :
+ *
+ * Frontend/
+ * ├── bg_1.png
+ * ├── logo_asari.png
+ * ├── src/
+ * │   ├── App.jsx
+ * │   └── ...
+ */
+
+/* ============================================================
+   GLOBAL PAGE
+   ============================================================ */
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: #020617;
+}
+
+body {
+  min-height: 100vh;
+  background: transparent;
+  color: #f1f5f9;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ============================================================
+   GLOBAL BACKGROUND
+   ============================================================ */
+
+/*
+ * Un seul fond global.
+ *
+ * L'image est fixée derrière toute l'application.
+ * L'overlay sombre permet de conserver la lisibilité
+ * du contenu tout en gardant l'image visible.
+ */
+
+#root {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -20;
+
+  background-image:
+    linear-gradient(
+      rgba(2, 6, 23, 0.78),
+      rgba(2, 6, 23, 0.78)
+    ),
+    url("/bg_1.png");
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  pointer-events: none;
+}
+
+/*
+ * Léger flou global pour intégrer l'image au design.
+ */
+
+#root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -19;
+
+  background: rgba(2, 6, 23, 0.08);
+
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+
+  pointer-events: none;
+}
+
+/* ============================================================
+   TRANSPARENT SECTIONS
+   ============================================================ */
+
+/*
+ * Les sections ne doivent plus créer de bandes horizontales.
+ */
+
+section {
+  background-color: transparent;
+}
+
+/* ============================================================
+   GLOBAL SURFACES
+   ============================================================ */
+
+/*
+ * Style uniforme disponible pour les blocs principaux.
+ *
+ * Tu peux utiliser :
+ *
+ * className="
+ *   bg-slate-900/80
+ *   backdrop-blur-md
+ *   border
+ *   border-slate-800/80
+ * "
+ *
+ * sur les cartes et panneaux.
+ */
+
+/* ============================================================
+   SMOOTH SCROLL
+   ============================================================ */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ============================================================
+   SELECTION
+   ============================================================ */
+
+::selection {
+  background: rgba(16, 185, 129, 0.35);
+  color: white;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.9);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 1);
+}
+
+/* ============================================================
+   PRINT CONFIGURATION
+   ============================================================ */
+
+@page {
+  size: 50mm 25mm;
+  margin: 0 !important;
+}
+
+@media print {
+
+  /*
+   * 1. Forcer la taille exacte de l'étiquette.
+   */
+
+  html,
+  body {
+    width: 50mm !important;
+    height: 25mm !important;
+    max-width: 50mm !important;
+    max-height: 25mm !important;
+
+    overflow: hidden !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    position: fixed !important;
+  }
+
+  /*
+   * 2. Masquer tout le contenu de l'application.
+   */
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  /*
+   * 3. Afficher uniquement l'étiquette.
+   */
+
+  #printable-label,
+  #printable-label * {
+    visibility: visible !important;
+  }
+
+  /*
+   * 4. Positionner l'étiquette en haut à gauche.
+   */
+
+  #printable-label {
+    position: fixed !important;
+
+    top: 0 !important;
+    left: 0 !important;
+
+    width: 50mm !important;
+    height: 25mm !important;
+
+    max-width: 50mm !important;
+    max-height: 25mm !important;
+
+    margin: 0 !important;
+    padding: 1.5mm !important;
+
+    box-sizing: border-box !important;
+
+    background: #ffffff !important;
+
+    border: none !important;
+    box-shadow: none !important;
+
+    transform: none !important;
+
+    z-index: 9999999 !important;
+
+    overflow: hidden !important;
+
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+}
