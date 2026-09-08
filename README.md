@@ -1,6 +1,6 @@
-# LabTrack Pro — Laboratory Sample Tracking & Traceability System
+#Laboratory Sample Tracking & Traceability System
 
-**LabTrack Pro** is an enterprise-grade laboratory sample tracking and chain-of-custody traceability web application designed to track laboratory samples seamlessly from initial reception intake through all analytical laboratory stages to final archival storage.
+the **Sample Tracking** is an enterprise-grade laboratory sample tracking and chain-of-custody traceability web application designed to track laboratory samples seamlessly from initial reception intake through all analytical laboratory stages to final archival storage.
 
 ---
 
@@ -36,7 +36,7 @@
 
 ## 1. Project Overview
 
-In laboratory environments (agricultural, botanical, metallurgical, chemical, and medical), tracking specimens accurately across various physical processing stations is critical. **LabTrack Pro** eliminates manual paper logbooks by providing a centralized digital system for sample intake, physical barcode tagging, automated stage progression via USB scanners, and immutable chain-of-custody logging.
+In laboratory environments (agricultural, botanical, metallurgical, chemical, and medical), tracking specimens accurately across various physical processing stations is critical. **Sample Tracking** eliminates manual paper logbooks by providing a centralized digital system for sample intake, physical barcode tagging, automated stage progression via USB scanners, and immutable chain-of-custody logging.
 
 ---
 
@@ -112,7 +112,7 @@ LabTrack Pro follows a **Decoupled Modular Monolith** architecture:
 ## 6. Project Structure
 
 ```text
-LabTrack Pro/
+Sample Tracking/
 ├── Backend/
 │   ├── app/
 │   │   ├── core/                  # Security, JWT tokens, & dependencies
@@ -306,7 +306,7 @@ The complete specimen lifecycle follows 4 mandatory ordered stages:
 
 ### Backend `.env`
 ```env
-PROJECT_NAME="LabTrack Pro"
+PROJECT_NAME="Sample Tracking"
 SECRET_KEY="your-super-secret-jwt-key-replace-in-production"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=480
