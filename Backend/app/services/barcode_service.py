@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import logging
 
@@ -14,7 +15,12 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-BARCODE_DIR = BASE_DIR / "generated" / "barcodes"
+
+# Redirection vers /tmp sur Vercel (système de fichiers en lecture seule)
+if os.environ.get("VERCEL"):
+    BARCODE_DIR = Path("/tmp/generated/barcodes")
+else:
+    BARCODE_DIR = BASE_DIR / "generated" / "barcodes"
 
 
 # ============================================================
