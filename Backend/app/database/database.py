@@ -2,12 +2,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import logging
 from app.core.config import settings
-
+import os
 logger = logging.getLogger(__name__)
 
 db_url = settings.get_database_url()
 
-
+# Si nous sommes sur Vercel, écrire la base dans /tmp/
+if os.environ.get("VERCEL"):
+    SQLALCHEMY_DATABASE_URL = "sqlite:////tmp/sample_tracking.db"
+else:
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./sample_tracking.db"
+    
 def create_db_engine(url: str):
     """Create database engine with fallback for local developer environments."""
     if url.startswith("postgresql"):
