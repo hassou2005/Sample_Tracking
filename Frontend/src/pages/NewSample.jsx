@@ -26,7 +26,21 @@ import StatusBadge from '../components/StatusBadge';
 import ErrorMessage from '../components/ErrorMessage';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'https://sample-tracking-backend.vercel.app';
+
+const getBarcodeUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://localhost') || path.startsWith('http://127.0.0.1')) {
+    const cleanPath = path.replace(/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
+    return `${API_BASE_URL}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+  }
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
 
 const getToday = () => {
   const today = new Date();
@@ -680,7 +694,7 @@ export const NewSample = () => {
               <div className="h-14 overflow-hidden flex items-start justify-center ">
                 {createdSample.barcode_url ? (
                   <img
-                    src={`${API_BASE_URL}${createdSample.barcode_url}`}
+                    src={getBarcodeUrl(createdSample.barcode_url)}
                     alt={`Barcode for ${finalCode}`}
                     className="h-20 max-w-full object-contain mx-auto"
                   />
@@ -787,7 +801,7 @@ export const NewSample = () => {
             <div className="print-label-barcode">
               {createdSample.barcode_url ? (
                 <img
-                  src={`${API_BASE_URL}${createdSample.barcode_url}`}
+                  src={getBarcodeUrl(createdSample.barcode_url)}
                   alt="Barcode"
                 />
               ) : (
@@ -838,7 +852,7 @@ export const NewSample = () => {
                 <div className="mt-3 flex justify-center">
                   {createdSample.barcode_url ? (
                     <img
-                      src={`${API_BASE_URL}${createdSample.barcode_url}`}
+                      src={getBarcodeUrl(createdSample.barcode_url)}
                       alt="Code 128 Barcode"
                       className="h-16 max-w-full object-contain mx-auto"
                     />
