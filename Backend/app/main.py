@@ -41,33 +41,31 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://sample-tracking.vercel.app",  # Votre URL Vercel
-]
-
-# Enable CORS for development
+# Enable CORS for development & Vercel deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # Autorise toutes les origines pour éviter les blocages CORS
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Redirection vers /tmp pour Vercel (système de fichiers en lecture seule)
+BASE_GEN_DIR = "/tmp/generated" if os.environ.get("VERCEL") else "generated"
+BARCODE_DIR = os.path.join(BASE_GEN_DIR, "barcodes")
+LABEL_DIR = os.path.join(BASE_GEN_DIR, "labels")
+
 # Ensure generated asset directories exist
-os.makedirs("generated/barcodes", exist_ok=True)
-os.makedirs("generated/labels", exist_ok=True)
+os.makedirs(BARCODE_DIR, exist_ok=True)
+os.makedirs(LABEL_DIR, exist_ok=True)
 
 # Clear old barcode cache so they are regenerated without the duplicate embedded text
 try:
-    barcode_dir = "generated/barcodes"
-    if os.path.exists(barcode_dir):
+    if os.path.exists(BARCODE_DIR):
         cleared_count = 0
-        for f in os.listdir(barcode_dir):
+        for f in os.listdir(BARCODE_DIR):
             if f.endswith(".png"):
-                os.remove(os.path.join(barcode_dir, f))
+                os.remove(os.path.join(BARCODE_DIR, f))
                 cleared_count += 1
         if cleared_count > 0:
             logger.info(f"Cleared {cleared_count} old cached barcodes to ensure text-free regeneration.")
@@ -75,8 +73,8 @@ except Exception as e:
     logger.error(f"Error clearing barcode cache: {e}")
 
 # Static file serving for generated barcodes/labels
-app.mount("/static/barcodes", StaticFiles(directory="generated/barcodes"), name="barcodes")
-app.mount("/static/labels", StaticFiles(directory="generated/labels"), name="labels")
+app.mount("/static/barcodes", StaticFiles(directory=BARCODE_DIR), name="barcodes")
+app.mount("/static/labels", StaticFiles(directory=LABEL_DIR), name="labels")
 
 # Include Routers
 app.include_router(health.router)
