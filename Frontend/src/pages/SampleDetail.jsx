@@ -28,6 +28,21 @@ import ConfirmDialog from '../components/ConfirmDialog';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+// Helper function to resolve absolute/relative barcode URLs cleanly
+const getBarcodeUrl = (barcodePath) => {
+  if (!barcodePath) return '';
+  
+  // If backend returned a full HTTP/HTTPS URL
+  if (barcodePath.startsWith('http://') || barcodePath.startsWith('https://')) {
+    return barcodePath;
+  }
+  
+  // Clean slashes to avoid double slashes
+  const cleanBase = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const cleanPath = barcodePath.startsWith('/') ? barcodePath : `/${barcodePath}`;
+  
+  return `${cleanBase}${cleanPath}`;
+};
 
 // Standard 4 workflow stages in sequential order
 const WORKFLOW_STAGES = [
@@ -230,8 +245,11 @@ export const SampleDetail = () => {
     }
   };
 
-  // Print thermal label - fixed header margins & full-width metadata text
+  // Print thermal label
   const handlePrint = () => {
+    const activeSample = data?.sample;
+    if (!activeSample) return;
+
     const escapeHtml = (value) =>
       String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -240,63 +258,38 @@ export const SampleDetail = () => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
-    const barcodeUrl = sample?.barcode_url
-      ? `${API_BASE_URL}${sample.barcode_url}`
-      : '';
+    const barcodeUrl = getBarcodeUrl(activeSample.barcode_url);
 
-    // Format :
-    // Prof.Project.Trial.Site.Crop.Plot.Part.Collector.ReceptionDate.Dest
     const metadataParts = [
-      sample?.prof,
-      sample?.project,
-      sample?.trial,
-      sample?.site,
-      sample?.crop,
-      sample?.plot,
-      sample?.part,
-      sample?.collector,
-      sample?.reception_date
-        ? new Date(sample.reception_date).toISOString().slice(0, 10)
+      activeSample?.prof,
+      activeSample?.project,
+      activeSample?.trial,
+      activeSample?.site,
+      activeSample?.crop,
+      activeSample?.plot,
+      activeSample?.part,
+      activeSample?.collector,
+      activeSample?.reception_date
+        ? new Date(activeSample.reception_date).toISOString().slice(0, 10)
         : '',
-      sample?.dest,
+      activeSample?.dest,
     ].map((val) => (val ? String(val).trim() : '—'));
 
     const formattedCode = `*${metadataParts.join('.')}*`;
     const escapedFormattedCode = escapeHtml(formattedCode);
 
-    // ============================================================
-    // CREATE PRINT LABEL INSIDE THE CURRENT PAGE
-    // ============================================================
+    const existingPrintLabel = document.getElementById('thermal-print-label');
+    if (existingPrintLabel) existingPrintLabel.remove();
 
-    const existingPrintLabel = document.getElementById(
-      'thermal-print-label'
-    );
-
-    if (existingPrintLabel) {
-      existingPrintLabel.remove();
-    }
-
-    const existingPrintStyle = document.getElementById(
-      'thermal-print-style'
-    );
-
-    if (existingPrintStyle) {
-      existingPrintStyle.remove();
-    }
-
-    // ============================================================
-    // PRINT-ONLY HTML
-    // ============================================================
+    const existingPrintStyle = document.getElementById('thermal-print-style');
+    if (existingPrintStyle) existingPrintStyle.remove();
 
     const printLabel = document.createElement('div');
-
     printLabel.id = 'thermal-print-label';
 
     printLabel.innerHTML = `
       <div class="thermal-label-content">
-
         <div class="barcode-area">
-
           <div class="barcode-crop">
             ${
               barcodeUrl
@@ -314,32 +307,19 @@ export const SampleDetail = () => {
                 `
             }
           </div>
-
           <div class="custom-code">
             ${escapedFormattedCode}
           </div>
-
         </div>
-
       </div>
     `;
 
     document.body.appendChild(printLabel);
 
-    // ============================================================
-    // PRINT CSS
-    // ============================================================
-
     const printStyle = document.createElement('style');
-
     printStyle.id = 'thermal-print-style';
 
     printStyle.textContent = `
-      /* ==========================================================
-        THERMAL LABEL PRINT
-        Physical size: 50mm x 25mm
-      ========================================================== */
-
       @page {
         size: 50mm 25mm;
         margin: 0;
@@ -350,9 +330,7 @@ export const SampleDetail = () => {
       }
 
       @media print {
-
-        html,
-        body {
+        html, body {
           width: 50mm !important;
           height: 25mm !important;
           margin: 0 !important;
@@ -361,26 +339,20 @@ export const SampleDetail = () => {
           background: #ffffff !important;
         }
 
-        /* Hide the complete application */
         body > * {
           visibility: hidden !important;
         }
 
-        /* Show only the thermal label */
         #thermal-print-label {
           display: block !important;
           visibility: visible !important;
-
           position: fixed !important;
           left: 0 !important;
           top: 0 !important;
-
           width: 50mm !important;
           height: 25mm !important;
-
           margin: 0 !important;
           padding: 0 !important;
-
           background: #ffffff !important;
           overflow: hidden !important;
         }
@@ -389,56 +361,34 @@ export const SampleDetail = () => {
           visibility: visible !important;
         }
 
-        /* ========================================================
-          LABEL CONTAINER
-        ======================================================== */
-
         .thermal-label-content {
           width: 50mm;
           height: 25mm;
-
           padding: 1mm 1.5mm;
-
           background: #ffffff;
-
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           align-items: center;
-
           overflow: hidden;
-
           box-sizing: border-box;
-
           font-family: Arial, Helvetica, sans-serif;
         }
-
-        /* ========================================================
-          BARCODE AREA
-        ======================================================== */
 
         .barcode-area {
           width: 100%;
           height: 100%;
-
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-
           overflow: hidden;
         }
-
-        /* ========================================================
-          BARCODE
-        ======================================================== */
 
         .barcode-crop {
           width: 100%;
           height: 12mm;
-
           overflow: hidden;
-
           display: flex;
           align-items: flex-start;
           justify-content: center;
@@ -446,20 +396,13 @@ export const SampleDetail = () => {
 
         .thermal-barcode-image {
           display: block;
-
           width: 47mm;
           height: 16mm;
-
           object-fit: cover;
           object-position: top;
-
           margin: 0;
           padding: 0;
         }
-
-        /* ========================================================
-          FALLBACK
-        ======================================================== */
 
         .barcode-fallback {
           font-family: monospace;
@@ -467,29 +410,17 @@ export const SampleDetail = () => {
           white-space: nowrap;
         }
 
-        /* ========================================================
-          CUSTOM CODE
-        ======================================================== */
-
         .custom-code {
           width: 100%;
-
           margin-top: 0.4mm;
-
           font-family: 'Courier New', Courier, monospace;
-
           font-size: 1.65mm;
           font-weight: 800;
-
           line-height: 1;
-
           text-align: center;
-
           white-space: nowrap;
-
           overflow: hidden;
           text-overflow: clip;
-
           letter-spacing: -0.02mm;
         }
       }
@@ -497,48 +428,20 @@ export const SampleDetail = () => {
 
     document.head.appendChild(printStyle);
 
-    // ============================================================
-    // PRINT
-    // ============================================================
-
-    const barcodeImage = printLabel.querySelector(
-      '.thermal-barcode-image'
-    );
-
+    const barcodeImage = printLabel.querySelector('.thermal-barcode-image');
     let printed = false;
 
     const cleanup = () => {
-      const label = document.getElementById(
-        'thermal-print-label'
-      );
-
-      const style = document.getElementById(
-        'thermal-print-style'
-      );
-
-      if (label) {
-        label.remove();
-      }
-
-      if (style) {
-        style.remove();
-      }
-
+      const label = document.getElementById('thermal-print-label');
+      const style = document.getElementById('thermal-print-style');
+      if (label) label.remove();
+      if (style) style.remove();
       window.removeEventListener('afterprint', cleanup);
     };
 
     const printNow = () => {
       if (printed) return;
-
       printed = true;
-
-      /*
-      * IMPORTANT:
-      * We use window.print() directly.
-      * No window.open()
-      * No new tab
-      * No popup window
-      */
       window.print();
     };
 
@@ -548,20 +451,15 @@ export const SampleDetail = () => {
       if (barcodeImage.complete) {
         setTimeout(printNow, 150);
       } else {
-        barcodeImage.onload = () => {
-          setTimeout(printNow, 150);
-        };
-
-        barcodeImage.onerror = () => {
-          setTimeout(printNow, 150);
-        };
-
+        barcodeImage.onload = () => setTimeout(printNow, 150);
+        barcodeImage.onerror = () => setTimeout(printNow, 150);
         setTimeout(printNow, 2500);
       }
     } else {
       setTimeout(printNow, 150);
     }
   };
+
   // Format date safely
   const formatDate = (dateVal, includeTime = false) => {
     if (!dateVal) return '—';
@@ -623,10 +521,10 @@ export const SampleDetail = () => {
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 relative text-slate-100 font-sans selection:bg-emerald-500 selection:text-white motion-reduce:animate-none">
 
-      {/* Ambient Background Radial Glow (Home Match) */}
+      {/* Ambient Background Radial Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-emerald-600/10 blur-[140px] pointer-events-none rounded-full" />
 
-      {/* 1. Header & Navigation Actions (Glassmorphism & Removed "Generate Label" Button) */}
+      {/* 1. Header & Navigation Actions */}
       <div className="bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-md rounded-2xl p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10 animate-in fade-in slide-in-from-top-3 duration-300">
         <div className="flex items-center space-x-3.5">
           <Link
@@ -653,7 +551,6 @@ export const SampleDetail = () => {
 
         {/* Header Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start md:self-auto">
-
           {isTechnician && (
             <button
               type="button"
@@ -661,17 +558,11 @@ export const SampleDetail = () => {
               className="group relative overflow-hidden px-4 py-2.5 bg-red-950/40 hover:bg-red-600/20 text-red-300 hover:text-red-200 border border-red-900/60 hover:border-red-500/70 rounded-xl text-sm font-bold transition-all duration-300 flex items-center space-x-2 shadow-lg shadow-red-950/20 hover:shadow-red-600/20 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
               title="Permanently delete this sample"
             >
-              {/* Animated hover glow */}
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-red-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-
               <Trash2 className="h-4 w-4 relative z-10 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
-
-              <span className="relative z-10">
-                Delete Sample
-              </span>
+              <span className="relative z-10">Delete Sample</span>
             </button>
           )}
-
         </div>
       </div>
 
@@ -682,11 +573,8 @@ export const SampleDetail = () => {
         <div className="md:col-span-1 space-y-6">
 
           <div className="bg-slate-900/70 border border-slate-800/90 shadow-2xl backdrop-blur-md rounded-2xl p-5 space-y-4 hover:border-emerald-500/50 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 relative overflow-hidden group">
-
-            {/* Top Accent Line */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 opacity-90" />
 
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center space-x-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -699,8 +587,7 @@ export const SampleDetail = () => {
             </div>
 
             <div className="space-y-3">
-
-              {/* 1. Highlighted Sample Code Box */}
+              {/* Highlighted Sample Code Box */}
               <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/90 flex items-center justify-between hover:border-emerald-500/40 transition-all shadow-inner">
                 <div>
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
@@ -727,126 +614,102 @@ export const SampleDetail = () => {
 
               {/* Key-Value Attributes Grid */}
               <div className="divide-y divide-slate-800/50 text-xs font-sans">
-
-                {/* 2. Prof */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Prof
                   </span>
-
                   <span className="font-semibold text-slate-200 text-right truncate max-w-[160px]">
                     {sample.prof || 'Not specified'}
                   </span>
                 </div>
 
-                {/* 3. Project */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Project
                   </span>
-
                   <span className="font-semibold text-slate-200 text-right truncate max-w-[160px]">
                     {sample.project || 'Not specified'}
                   </span>
                 </div>
 
-                {/* 4. Trial */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Trial
                   </span>
-
                   <span className="font-semibold text-slate-200 text-right truncate max-w-[160px]">
                     {sample.trial || 'Not specified'}
                   </span>
                 </div>
 
-                {/* 5. Site */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Site
                   </span>
-
                   <div className="flex items-center space-x-1.5 font-semibold text-slate-200">
                     <MapPin className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-
                     <span className="truncate max-w-[150px]">
                       {sample.site || 'Not specified'}
                     </span>
                   </div>
                 </div>
 
-                {/* 6. Crop */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Crop
                   </span>
-
                   <span className="font-semibold text-emerald-300 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md text-[11px]">
                     {sample.crop || 'Not specified'}
                   </span>
                 </div>
 
-                {/* 7. Plot */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Plot
                   </span>
-
                   <span className="font-semibold text-slate-200">
                     {sample.plot || 'Not specified'}
                   </span>
                 </div>
 
-                {/* 8. Part */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Part
                   </span>
-
                   <span className="font-semibold text-slate-200">
                     {sample.part || 'Not specified'}
                   </span>
                 </div>
 
-                {/* 9. Collector */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Collector
                   </span>
-
                   <div className="flex items-center space-x-1.5 font-semibold text-slate-200">
                     <UserIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-
                     <span className="truncate max-w-[150px]">
                       {sample.collector || 'Not specified'}
                     </span>
                   </div>
                 </div>
 
-                {/* 10. Reception Date */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Reception Date
                   </span>
-
                   <div className="flex items-center space-x-1.5 font-mono text-slate-300">
                     <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     <span>{formatDate(sample.reception_date)}</span>
                   </div>
                 </div>
 
-                {/* 11. Destination */}
                 <div className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-800/30 rounded-lg transition-colors">
                   <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wide">
                     Dest
                   </span>
-
                   <span className="font-semibold text-slate-200">
                     {sample.dest || 'Not specified'}
                   </span>
                 </div>
-
               </div>
             </div>
           </div>
@@ -866,7 +729,7 @@ export const SampleDetail = () => {
             <div className="bg-white p-3.5 rounded-xl border border-slate-800 flex justify-center shadow-lg">
               {sample.barcode_url ? (
                 <img
-                  src={`${API_BASE_URL}${sample.barcode_url}`}
+                  src={getBarcodeUrl(sample.barcode_url)}
                   alt={`Barcode for ${sample.sample_code}`}
                   className="h-12 max-w-full object-contain mx-auto"
                 />
@@ -892,12 +755,10 @@ export const SampleDetail = () => {
 
           {/* Section 3: LABORATORY WORKFLOW PROGRESSION */}
           <div className="bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-md rounded-2xl p-6 space-y-4 hover:border-emerald-500/40 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-
             <div>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">
                 Laboratory Workflow Progression
               </h2>
-
               <p className="text-xs text-slate-400 mt-1">
                 Stage progression status from Reception intake to Custody Storage
               </p>
@@ -973,13 +834,11 @@ export const SampleDetail = () => {
 
           {/* Section 4: COMPLETE MOVEMENT HISTORY TIMELINE */}
           <div className="bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-md rounded-2xl p-6 space-y-4 hover:border-emerald-500/40 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 delay-100">
-
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">
                   Complete Movement History Timeline
                 </h2>
-
                 <p className="text-xs text-slate-400 mt-1">
                   Immutable chronological audit logs for chain of custody
                 </p>
@@ -990,7 +849,6 @@ export const SampleDetail = () => {
               </span>
             </div>
 
-            {/* Timeline Component */}
             <div className="relative border-l-2 border-emerald-500/30 ml-4 space-y-6 my-4">
               {history && history.length > 0 ? (
                 history.map((item, idx) => (
@@ -998,14 +856,11 @@ export const SampleDetail = () => {
                     key={item.id || idx}
                     className="relative pl-6 group"
                   >
-                    {/* Timeline Node */}
                     <div className="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 group-hover:scale-125 transition-transform flex items-center justify-center">
                       <div className="h-1.5 w-1.5 bg-white rounded-full" />
                     </div>
 
-                    {/* Log Card */}
                     <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 shadow-xl hover:border-emerald-500/40 transition-all">
-
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-800/60">
                         <div className="flex items-center space-x-2">
                           {item.from_stage ? (
@@ -1019,7 +874,6 @@ export const SampleDetail = () => {
                               <span className="text-xs text-slate-400 font-semibold">
                                 Initial Registration:
                               </span>
-
                               <StatusBadge stageName={item.to_stage.name} />
                             </div>
                           )}
@@ -1041,7 +895,6 @@ export const SampleDetail = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-400 mb-2">
                         <div className="flex items-center space-x-1.5">
                           <MapPin className="h-3.5 w-3.5 text-slate-500" />
-
                           <span>
                             Zone:{' '}
                             <strong className="text-slate-200 font-medium">
@@ -1052,7 +905,6 @@ export const SampleDetail = () => {
 
                         <div className="flex items-center space-x-1.5">
                           <UserIcon className="h-3.5 w-3.5 text-slate-500" />
-
                           <span>
                             Operator:{' '}
                             <strong className="text-slate-200 font-medium">
@@ -1089,11 +941,9 @@ export const SampleDetail = () => {
       {showMoveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-white">
-
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
                 <ArrowRightLeft className="h-5 w-5 text-emerald-400" />
-
                 <h3 className="text-base font-bold text-white">
                   Move Specimen
                 </h3>
@@ -1251,7 +1101,6 @@ export const SampleDetail = () => {
             </div>
 
             {/* Label Visual Simulation Container */}
-            {/* Label Visual Simulation Container */}
             <div className="p-6 bg-slate-950/90 rounded-2xl flex justify-center border border-slate-800/80">
               <div className="w-[320px] bg-white text-slate-900 rounded-xl p-3 shadow-xl flex flex-col justify-between space-y-2 border border-slate-200">
 
@@ -1271,7 +1120,7 @@ export const SampleDetail = () => {
                 {/* Barcode Center */}
                 <div className="py-2 text-center bg-slate-50/80 rounded border border-slate-100 flex items-center justify-center min-h-[55px]">
                   <img
-                    src={`${API_BASE_URL}${sample.barcode_url}`}
+                    src={getBarcodeUrl(sample.barcode_url)}
                     alt="Code 128 Barcode"
                     className="h-12 max-w-full object-contain mx-auto"
                   />
@@ -1318,7 +1167,7 @@ export const SampleDetail = () => {
         </div>
       )}
 
-      {/* Printable label is generated in an isolated print window by handlePrint(). */}
+      {/* Printable label container */}
       <div className="hidden" aria-hidden="true" />
 
       {/* Delete Confirmation Dialog */}
