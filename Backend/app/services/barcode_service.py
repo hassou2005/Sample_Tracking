@@ -1,6 +1,4 @@
 import os
-import io
-import base64
 from pathlib import Path
 import logging
 
@@ -136,9 +134,9 @@ def generate_barcode(
     sample_name: str = "Sample",
 ) -> str:
     """
-    Generate a Code 128 barcode image completely IN-MEMORY for a laboratory sample.
+    Generate a Code 128 barcode image for a laboratory sample.
 
-    Returns a Base64 Data URI string (data:image/png;base64,...).
+    The sample_code is encoded in Code 128 and displayed below the barcode.
     """
 
     # --------------------------------------------------------
@@ -164,9 +162,38 @@ def generate_barcode(
     else:
         display_code = cleaned_code
 
+    # --------------------------------------------------------
+    # Ensure output directory exists
+    # --------------------------------------------------------
+
+    BARCODE_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    target_file = get_barcode_file_path(cleaned_code)
+
+    # --------------------------------------------------------
+    # Return existing barcode
+    # --------------------------------------------------------
+
+    if barcode_exists(cleaned_code):
+        logger.info(
+            "Barcode for '%s' already exists at %s. "
+            "Skipping generation.",
+            cleaned_code,
+            target_file,
+        )
+
+        return (
+            f"/static/barcodes/{target_file.name}"
+        )
+
+    temp_generated_path = None
+
     try:
         # ====================================================
-        # STEP 1 — GENERATE RAW CODE 128 IN-MEMORY (NO DISK FILE)
+        # STEP 1 — GENERATE RAW CODE 128 BARCODE (NO TEXT)
         # ====================================================
 
         code128_class = barcode.get_barcode_class("code128")
@@ -177,6 +204,7 @@ def generate_barcode(
         writer_options = {
             "module_width": 0.35,
             "module_height": 14.0,
+            # write_text = False empêche python-barcode d'écrire le texte sous les barres
             "write_text": False,
             "quiet_zone": 6.5,
         }
@@ -195,157 +223,182 @@ def generate_barcode(
             writer=writer,
         )
 
-        # Génération du code-barres brut sous forme d'image PIL en mémoire RAM
-        source_image = barcode_instance.render(writer_options).convert("RGB")
+        temp_prefix = BARCODE_DIR / (
+            f"{_safe_filename(cleaned_code)}_barcode"
+        )
+
+        saved_path = barcode_instance.save(
+            str(temp_prefix),
+            options=writer_options,
+        )
+
+        temp_generated_path = Path(saved_path)
 
         # ====================================================
-        # STEP 2 — ASSEMBLE LABEL IN-MEMORY
+        # STEP 2 — OPEN GENERATED BARCODE & ASSEMBLE LABEL
         # ====================================================
 
-        barcode_width, barcode_height = source_image.size
+        with Image.open(saved_path) as source_image:
+            source_image = source_image.convert("RGB")
 
-        horizontal_padding = 35
-        vertical_padding = 18
+            barcode_width, barcode_height = source_image.size
 
-        header_height = 45
-        middle_spacing = 18
-        code_text_height = 40
-        bottom_padding = 18
+            horizontal_padding = 35
+            vertical_padding = 18
 
-        label_width = max(
-            barcode_width + horizontal_padding * 2,
-            700,
-        )
+            header_height = 45
+            middle_spacing = 18
+            code_text_height = 40
+            bottom_padding = 18
 
-        label_height = (
-            vertical_padding
-            + header_height
-            + middle_spacing
-            + barcode_height
-            + 12
-            + code_text_height
-            + bottom_padding
-        )
-
-        label = Image.new(
-            "RGB",
-            (label_width, label_height),
-            "white",
-        )
-
-        draw = ImageDraw.Draw(label)
-
-        header_font = _get_font(22, bold=True)
-        sample_name_font = _get_font(18, bold=True)
-        code_font = _get_font(17, bold=False)
-
-        # Header Left
-        draw.text(
-            (horizontal_padding, vertical_padding),
-            "ASARI Sample Tracking",
-            fill="black",
-            font=header_font,
-        )
-
-        # Header Right
-        safe_sample_name = (
-            str(sample_name).strip()
-            if sample_name
-            else "Sample"
-        )
-
-        if len(safe_sample_name) > 35:
-            safe_sample_name = (
-                safe_sample_name[:32] + "..."
+            label_width = max(
+                barcode_width + horizontal_padding * 2,
+                700,
             )
 
-        right_bbox = draw.textbbox(
-            (0, 0),
-            safe_sample_name,
-            font=sample_name_font,
-        )
+            label_height = (
+                vertical_padding
+                + header_height
+                + middle_spacing
+                + barcode_height
+                + 12
+                + code_text_height
+                + bottom_padding
+            )
 
-        right_text_width = (
-            right_bbox[2] - right_bbox[0]
-        )
+            label = Image.new(
+                "RGB",
+                (label_width, label_height),
+                "white",
+            )
 
-        right_x = (
-            label_width
-            - horizontal_padding
-            - right_text_width
-        )
+            draw = ImageDraw.Draw(label)
 
-        draw.text(
-            (right_x, vertical_padding + 2),
-            safe_sample_name,
-            fill="black",
-            font=sample_name_font,
-        )
+            header_font = _get_font(22, bold=True)
+            sample_name_font = _get_font(18, bold=True)
+            code_font = _get_font(17, bold=False)
 
-        # Separator Line
-        separator_y = (
-            vertical_padding + header_height
-        )
+            # Header Left
+            draw.text(
+                (horizontal_padding, vertical_padding),
+                "ASARI Sample Tracking",
+                fill="black",
+                font=header_font,
+            )
 
-        draw.line(
-            (
-                horizontal_padding,
-                separator_y,
-                label_width - horizontal_padding,
-                separator_y,
-            ),
-            fill="black",
-            width=1,
-        )
+            # Header Right
+            safe_sample_name = (
+                str(sample_name).strip()
+                if sample_name
+                else "Sample"
+            )
 
-        # Paste Barcode Center
-        barcode_x = (label_width - barcode_width) // 2
-        barcode_y = separator_y + middle_spacing
+            if len(safe_sample_name) > 35:
+                safe_sample_name = (
+                    safe_sample_name[:32] + "..."
+                )
 
-        label.paste(
-            source_image,
-            (barcode_x, barcode_y),
-        )
+            right_bbox = draw.textbbox(
+                (0, 0),
+                safe_sample_name,
+                font=sample_name_font,
+            )
 
-        # Draw Custom Display Code Under Barcode
-        code_bbox = draw.textbbox(
-            (0, 0),
-            display_code,
-            font=code_font,
-        )
+            right_text_width = (
+                right_bbox[2] - right_bbox[0]
+            )
 
-        code_width = (
-            code_bbox[2] - code_bbox[0]
-        )
+            right_x = (
+                label_width
+                - horizontal_padding
+                - right_text_width
+            )
 
-        code_x = (label_width - code_width) // 2
-        code_y = barcode_y + barcode_height + 8
+            draw.text(
+                (right_x, vertical_padding + 2),
+                safe_sample_name,
+                fill="black",
+                font=sample_name_font,
+            )
 
-        draw.text(
-            (code_x, code_y),
-            display_code,
-            fill="black",
-            font=code_font,
-        )
+            # Separator Line
+            separator_y = (
+                vertical_padding + header_height
+            )
 
-        # ====================================================
-        # STEP 3 — CONVERT TO BASE64 DATA URI IN-MEMORY
-        # ====================================================
+            draw.line(
+                (
+                    horizontal_padding,
+                    separator_y,
+                    label_width - horizontal_padding,
+                    separator_y,
+                ),
+                fill="black",
+                width=1,
+            )
 
-        buffer = io.BytesIO()
-        label.save(
-            buffer,
-            format="PNG",
-            optimize=True,
-        )
-        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            # Paste Barcode Center
+            barcode_x = (label_width - barcode_width) // 2
+            barcode_y = separator_y + middle_spacing
+
+            label.paste(
+                source_image,
+                (barcode_x, barcode_y),
+            )
+
+            # Draw Custom Display Code Under Barcode
+            code_bbox = draw.textbbox(
+                (0, 0),
+                display_code,
+                font=code_font,
+            )
+
+            code_width = (
+                code_bbox[2] - code_bbox[0]
+            )
+
+            code_x = (label_width - code_width) // 2
+            code_y = barcode_y + barcode_height + 8
+
+            draw.text(
+                (code_x, code_y),
+                display_code,
+                fill="black",
+                font=code_font,
+            )
+
+            # Save Final Image
+            label.save(
+                target_file,
+                format="PNG",
+                optimize=True,
+            )
+
+        # Cleanup Temp Raw Barcode
+        if (
+            temp_generated_path
+            and temp_generated_path.is_file()
+            and temp_generated_path != target_file
+        ):
+            try:
+                temp_generated_path.unlink()
+            except Exception as cleanup_error:
+                logger.warning(
+                    "Could not remove temporary barcode file %s: %s",
+                    temp_generated_path,
+                    cleanup_error,
+                )
+
+        with Image.open(target_file) as img:
+            img.verify()
 
         logger.info(
-            "Successfully generated in-memory ASARI Code 128 label for sample '%s'",
+            "Successfully generated ASARI Code 128 label for sample '%s' at: %s",
             display_code,
+            target_file,
         )
 
-        return f"data:image/png;base64,{base64_str}"
+        return f"/static/barcodes/{target_file.name}"
 
     except Exception as exc:
         logger.error(
@@ -353,6 +406,18 @@ def generate_barcode(
             display_code,
             exc,
         )
+
+        if temp_generated_path and temp_generated_path.is_file():
+            try:
+                temp_generated_path.unlink()
+            except Exception:
+                pass
+
+        if target_file.is_file():
+            try:
+                target_file.unlink()
+            except Exception:
+                pass
 
         raise BarcodeGenerationError(
             f"Could not generate barcode for '{display_code}': {exc}"
